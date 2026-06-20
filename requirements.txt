@@ -1,0 +1,10 @@
+flask
+flask-cors
+requests
+spacy
+newspaper3k
+beautifulsoup4
+google-genai
+gunicorn
+lxml
+lxml_html_clean
