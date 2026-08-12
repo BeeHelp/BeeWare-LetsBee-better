@@ -16,7 +16,7 @@ from google import genai
 from google.genai import types
 
 nlp_sm = spacy.load("es_core_news_sm")
-nlp_lg = spacy.load("es_core_news_lg")
+nlp_lg = spacy.load("es_core_news_md")
 
 googleaistudio_api_key = os.environ.get("GOOGLE_AI_API_KEY")
 gnews_api_key = os.environ.get("GNEWS_API_KEY")
