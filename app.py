@@ -116,7 +116,7 @@ El puntaje mide CONSISTENCIA ENTRE FUENTES, no veracidad. Si el ratio de
 corroboración es < 50%, menciónalo explícitamente en la conclusión.
 ## SALIDA
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional y sin bloques
-de markdown, que cumpla el esquema indicado.
+de markdown, que cumpla el esquema indicado."""
 
 
 def keyword_extraction(contenido, titulo, top_n=5):
