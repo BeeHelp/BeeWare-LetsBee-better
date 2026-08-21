@@ -1,7 +1,6 @@
 import sys
 import subprocess
 import os
-subprocess.check_call([sys.executable, "-m", "pip", "install", "newspaper3k"])
 import requests
 import json
 import re
@@ -141,7 +140,7 @@ ESQUEMA_V2 = {
 
 
 config = types.GenerateContentConfig(  
-    system_configuration = """
+    system_instruction = """
         Eres un sistema automatizado de análisis de consistencia entre fuentes para noticias.
         No eres un juez de la verdad: tu tarea es comparar una NOTICIA_BASE contra otras 
         versiones y reportar contradicciones, omisiones, coincidencias y datos no
@@ -182,8 +181,6 @@ config = types.GenerateContentConfig(
         5. Registra como coincidencia un dato de la base que aparece IDÉNTICO en al menos
         2 versiones independientes entre sí. Dos versiones NO son independientes si son
         duplicados casi textuales (≥90% idénticas) o copias declaradas de la misma
-
-        Con la fórmula v2, los casos que antes fallaban ahora dan:
         agencia. Un mismo hecho se registra UNA sola vez, listando todas las fuentes
         que lo respaldan.
         6. Marca es_central=true si el dato pertenece al hecho principal de la noticia.
@@ -199,14 +196,14 @@ config = types.GenerateContentConfig(
         agencia o duplicados entre sí), emite una alerta tipo "diversidad_baja": la
         corroboración es débil aunque no haya contradicciones.
         ## PUNTAJE (aritmética fija, sin criterio propio)
-        - Inicia en 10.0.
-        - Descuentos: −1.5 por contradicción CRITICA; −0.3 por MENOR; −0.4 por omisión
-        significativa; −0.2 por dato central no_verificable (tope de descuento por este
-        concepto: −2.0).
-        - Bonus: +0.2 por coincidencia de dato central (tope: +1.0). El bonus NO se aplica
+        - Inicia en 100.0.
+        - Descuentos: −15 por contradicción CRITICA; −3 por MENOR; −4 por omisión
+        significativa; −2 por dato central no_verificable (tope de descuento por este
+        concepto: −20).
+        - Bonus: +2 por coincidencia de dato central (tope: +10). El bonus NO se aplica
         si existe al menos 1 contradicción CRITICA.
-        - Piso 0.0, techo 10.0.
-        - Bandas: ALTO ≥ 9.0; MEDIO 6.0–8.9; BAJO < 6.0.
+        - Piso 0.0, techo 100.0.
+        - Bandas: ALTO ≥ 90.0; MEDIO 60.0–89.9; BAJO < 60.0.
         - ratio_corroboracion = (datos centrales de la base corroborados en ≥2 fuentes
         independientes) / (datos centrales totales de la base).
         ## IMPORTANTE
@@ -220,6 +217,7 @@ config = types.GenerateContentConfig(
     seed=42,
     response_mime_type="application/json",
     response_schema=ESQUEMA_V2,
+    max_output_tokens=3000
 )
     
     
@@ -290,6 +288,15 @@ def _buscar_urls_candidatas(keywords):
                     saved_urls.append(href)
     return saved_urls
 
+def _armar_prompt_v2(noticia_base, otras_versiones):
+    """Arma el texto con las etiquetas <NOTICIA_BASE>/<OTRA_VERSION> que
+    pide el prompt, en vez de mandar un JSON crudo."""
+    partes = [f"<NOTICIA_BASE>\n{noticia_base}\n</NOTICIA_BASE>"]
+    for i, version in enumerate(otras_versiones, start=1):
+        partes.append(
+            f'<OTRA_VERSION id="{i}" fuente="{version["fuente"]}">\n{version["texto"]}\n</OTRA_VERSION>'
+        )
+    return "\n".join(partes)
 
 def compute_score(noticia):
     keywords = noticia["keywords"]
@@ -341,7 +348,7 @@ def compute_score(noticia):
 
     promedio_coincidencia = (tasa_validacion + tasa_numeros_correctos) / 2
     if noticias_validas == 0:
-        veracidad = 68.0
+        veracidad = 00.0
     else:
         veracidad = 50.0 + (promedio_coincidencia * 50.0)
         veracidad = max(0.0, min(100.0, round(veracidad, 2)))
@@ -357,19 +364,21 @@ def compute_score(noticia):
             {"fuente": url, "texto": contenidos[url][:CARACTERES_CONTRASTE_IA]}
             for url in urls_validas
         ]
-        payload = {
-            "noticia_base": noticia["content"][:CARACTERES_CONTRASTE_IA],
-            "otras_versiones": otras_versiones,
-        }
+        
+        prompt = _armar_prompt_v2(noticia["content"][:CARACTERES_CONTRASTE_IA], otras_versiones)
+
         try:
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=json.dumps(payload, ensure_ascii=False),
+                contents=prompt,
                 config=config,
             )
             analisis_data = json.loads(response.text)
-            veracidad_total_gis = analisis_data["resumen"]["puntaje_veracidad"]
+            veracidad_total_gis = analisis_data["resumen"]["puntaje_consistencia"]
             conclusion_gis = analisis_data["resumen"]["conclusion"]
+
+            if veracidad_total_gis is not None:
+                veracidad_total_gis = max(0.0, min(100.0, round(veracidad_total_gis, 2)))
         except Exception:
             veracidad_total_gis = None
 
