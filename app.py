@@ -426,6 +426,7 @@ def _procesar_articulo(i, art):
     titulo = art.get("title", "")
     contenido = art.get("content", "") or ""
     imagen = art.get("image")
+    url_noticia = art.get("url")
 
     contenido = contenido.replace("\n", " ")
     contenido = re.sub(r"ver también\s*", " ", contenido, flags=re.IGNORECASE)
@@ -447,6 +448,7 @@ def _procesar_articulo(i, art):
         "image": imagen,
         "content": contenido,
         "keywords": keywords,
+        "url": url_noticia,
     }
 
 
