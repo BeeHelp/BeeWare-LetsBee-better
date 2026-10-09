@@ -478,7 +478,7 @@ def obtener_noticias():
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
 
-@app.route("/verify", methods=["POST"])
+@app.route("/verify", methods=["GET", "POST"])
 def verificar_noticia():
     """Endpoint 'bajo demanda': la app (App Inventor) lo llama SOLO cuando
     el usuario abre una noticia puntual. Recibe el content y keywords que
