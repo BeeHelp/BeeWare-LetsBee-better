@@ -492,6 +492,7 @@ def verificar_noticia():
     }
     """
     body = request.get_json(silent=True) or {}
+    print("BODY RECIBIDO:", body, flush=True)
     contenido = (body.get("content") or "").strip()
     keywords = body.get("keywords") or []
 
