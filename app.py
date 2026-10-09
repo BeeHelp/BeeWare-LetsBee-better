@@ -1,5 +1,3 @@
-import sys
-import subprocess
 import os
 import requests
 import json
@@ -32,117 +30,118 @@ PAGINAS_CONTRASTE = [
     "https://www.emol.com",
 ]
 
-MAX_FUENTES_CONTRASTE = 3        
-CARACTERES_CONTRASTE_IA = 1200   
-MAX_WORKERS_DESCARGA = 6         
+MAX_FUENTES_CONTRASTE = 3
+CARACTERES_CONTRASTE_IA = 1200
+MAX_WORKERS_DESCARGA = 6
+MAX_WORKERS_SCORE = 3  # noticias procesadas en paralelo en /process
 
 ESQUEMA_V2 = {
     "type": "OBJECT",
     "properties": {
-    "contradicciones": {
-        "type": "ARRAY",
-        "items": {
-            "type": "OBJECT",
-            "properties": {
-                "tipo": {"type": "STRING", "enum": ["CRITICA", "MENOR"]},
-                "campo": {"type": "STRING", "enum": ["cifra", "fecha", "nombre", "lugar", "declaracion", "otro"]},
-                "noticia_base": {"type": "STRING"},
-                "otras_fuentes": {
-                    "type": "ARRAY",
-                    "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "fuente_id": {"type": "STRING"},
-                            "valor": {"type": "STRING"}
-                        },
-                        "required": ["fuente_id", "valor"]
-                    }
+        "contradicciones": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "tipo": {"type": "STRING", "enum": ["CRITICA", "MENOR"]},
+                    "campo": {"type": "STRING", "enum": ["cifra", "fecha", "nombre", "lugar", "declaracion", "otro"]},
+                    "noticia_base": {"type": "STRING"},
+                    "otras_fuentes": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "fuente_id": {"type": "STRING"},
+                                "valor": {"type": "STRING"}
+                            },
+                            "required": ["fuente_id", "valor"]
+                        }
+                    },
+                    "descripcion": {"type": "STRING"}
                 },
-                "descripcion": {"type": "STRING"}
-            },
-            "required": ["tipo", "campo", "noticia_base", "otras_fuentes", "descripcion"]
-        }
-    },
-    "omisiones_significativas": {
-        "type": "ARRAY",
-        "items": {
-            "type": "OBJECT",
-            "properties": {
-                "dato_omitido": {"type": "STRING"},
-                "presente_en": {"type": "ARRAY", "items": {"type": "STRING"}},
-                "impacto": {"type": "STRING"}
-            },
-            "required": ["dato_omitido", "presente_en", "impacto"]
-        }
-    },
-    "coincidencias": {
-        "type": "ARRAY",
-        "items": {
-            "type": "OBJECT",
-            "properties": {
-                "dato": {"type": "STRING"},
-                "fuentes_que_coinciden": {"type": "ARRAY", "items": {"type": "STRING"}},
-                "es_central": {"type": "BOOLEAN"}
-            },
-            "required": ["dato", "fuentes_que_coinciden", "es_central"]
-        }
-    },
-    "no_verificables": {
-        "type": "ARRAY",
-        "items": {
-            "type": "OBJECT",
-            "properties": {
-                "dato": {"type": "STRING"},
-                "es_central": {"type": "BOOLEAN"},
-                "por_que": {"type": "STRING"}
-            },
-            "required": ["dato", "es_central", "por_que"]
-        }
-    },
-    "alertas": {
-        "type": "ARRAY",
-        "items": {
-            "type": "OBJECT",
-            "properties": {
-                "tipo": {"type": "STRING", "enum": ["diversidad_baja", "fuente_duplicada", "fuentes_insuficientes"]},
-                "detalle": {"type": "STRING"}
-            },
-            "required": ["tipo", "detalle"]
-        }
-    },
-    "resumen": {
-        "type": "OBJECT",
-        "properties": {
-            "total_contradicciones_criticas": {"type": "NUMBER"},
-            "total_contradicciones_menores": {"type": "NUMBER"},
-            "total_omisiones": {"type": "NUMBER"},
-            "total_coincidencias": {"type": "NUMBER"},
-            "total_no_verificables_centrales": {"type": "NUMBER"},
-            "ratio_corroboracion": {"type": "NUMBER"},
-            "nivel_consistencia": {"type": "STRING", "enum": ["ALTO", "MEDIO", "BAJO"]},
-            "puntaje_consistencia": {"type": "NUMBER"},
-            "conclusion": {"type": "STRING"}
+                "required": ["tipo", "campo", "noticia_base", "otras_fuentes", "descripcion"]
+            }
         },
-        "required": [
-            "total_contradicciones_criticas",
-            "total_contradicciones_menores",
-            "total_omisiones",
-            "total_coincidencias",
-            "total_no_verificables_centrales",
-            "ratio_corroboracion",
-            "nivel_consistencia",
-            "puntaje_consistencia",
-            "conclusion"
-        ]
+        "omisiones_significativas": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "dato_omitido": {"type": "STRING"},
+                    "presente_en": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "impacto": {"type": "STRING"}
+                },
+                "required": ["dato_omitido", "presente_en", "impacto"]
+            }
+        },
+        "coincidencias": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "dato": {"type": "STRING"},
+                    "fuentes_que_coinciden": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "es_central": {"type": "BOOLEAN"}
+                },
+                "required": ["dato", "fuentes_que_coinciden", "es_central"]
+            }
+        },
+        "no_verificables": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "dato": {"type": "STRING"},
+                    "es_central": {"type": "BOOLEAN"},
+                    "por_que": {"type": "STRING"}
+                },
+                "required": ["dato", "es_central", "por_que"]
+            }
+        },
+        "alertas": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "tipo": {"type": "STRING", "enum": ["diversidad_baja", "fuente_duplicada", "fuentes_insuficientes"]},
+                    "detalle": {"type": "STRING"}
+                },
+                "required": ["tipo", "detalle"]
+            }
+        },
+        "resumen": {
+            "type": "OBJECT",
+            "properties": {
+                "total_contradicciones_criticas": {"type": "NUMBER"},
+                "total_contradicciones_menores": {"type": "NUMBER"},
+                "total_omisiones": {"type": "NUMBER"},
+                "total_coincidencias": {"type": "NUMBER"},
+                "total_no_verificables_centrales": {"type": "NUMBER"},
+                "ratio_corroboracion": {"type": "NUMBER"},
+                "nivel_consistencia": {"type": "STRING", "enum": ["ALTO", "MEDIO", "BAJO"]},
+                "puntaje_consistencia": {"type": "NUMBER"},
+                "conclusion": {"type": "STRING"}
+            },
+            "required": [
+                "total_contradicciones_criticas",
+                "total_contradicciones_menores",
+                "total_omisiones",
+                "total_coincidencias",
+                "total_no_verificables_centrales",
+                "ratio_corroboracion",
+                "nivel_consistencia",
+                "puntaje_consistencia",
+                "conclusion"
+            ]
+        }
     }
 }
-}
 
 
-config = types.GenerateContentConfig(  
-    system_instruction = """
+config = types.GenerateContentConfig(
+    system_instruction="""
         Eres un sistema automatizado de análisis de consistencia entre fuentes para noticias.
-        No eres un juez de la verdad: tu tarea es comparar una NOTICIA_BASE contra otras 
+        No eres un juez de la verdad: tu tarea es comparar una NOTICIA_BASE contra otras
         versiones y reportar contradicciones, omisiones, coincidencias y datos no
         verificables, aplicando exclusivamente las reglas fijas de abajo.
         ## ENTRADA
@@ -219,8 +218,6 @@ config = types.GenerateContentConfig(
     response_schema=ESQUEMA_V2,
     max_output_tokens=3000
 )
-    
-    
 
 
 def keyword_extraction(contenido, titulo, top_n=5):
@@ -246,8 +243,7 @@ def keyword_extraction(contenido, titulo, top_n=5):
 
 
 def _descargar_articulo(url):
-    """Descarga y parsea un artículo UNA sola vez. Antes se descargaba
-    hasta 3 veces la misma URL en distintas partes de compute_score."""
+    """Descarga y parsea un artículo UNA sola vez."""
     try:
         articulo = Article(url, config=NEWSPAPER_CONFIG)
         articulo.download()
@@ -288,9 +284,9 @@ def _buscar_urls_candidatas(keywords):
                     saved_urls.append(href)
     return saved_urls
 
+
 def _armar_prompt_v2(noticia_base, otras_versiones):
-    """Arma el texto con las etiquetas <NOTICIA_BASE>/<OTRA_VERSION> que
-    pide el prompt, en vez de mandar un JSON crudo."""
+    """Arma el texto con las etiquetas <NOTICIA_BASE>/<OTRA_VERSION>."""
     partes = [f"<NOTICIA_BASE>\n{noticia_base}\n</NOTICIA_BASE>"]
     for i, version in enumerate(otras_versiones, start=1):
         partes.append(
@@ -298,13 +294,15 @@ def _armar_prompt_v2(noticia_base, otras_versiones):
         )
     return "\n".join(partes)
 
-def compute_score(noticia):
+
+def calcular_score_matematico(noticia):
+    """Parte matemática (sin IA): scraping + similitud + entidades y cifras.
+    Devuelve el puntaje, las URLs válidas y los contenidos descargados."""
     keywords = noticia["keywords"]
-    doc_original = nlp_lg(noticia["content"])  # un solo parseo, reutilizado abajo
+    doc_original = nlp_lg(noticia["content"])
 
     candidatas = _buscar_urls_candidatas(keywords)
 
-    # Descarga en paralelo, una sola vez por URL (antes: hasta 3 veces c/u)
     contenidos = {}
     if candidatas:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS_DESCARGA) as ex:
@@ -314,48 +312,46 @@ def compute_score(noticia):
                 if texto:
                     contenidos[url] = texto
 
-    # Filtro de similitud semántica
     urls_validas = []
     for url, texto in contenidos.items():
-        similitud = doc_original.similarity(nlp_lg(texto))
-        if similitud > 0.75:
+        if doc_original.similarity(nlp_lg(texto)) > 0.75:
             urls_validas.append(url)
-
-    # Tope de fuentes -> menos tokens/tiempo en el paso de IA
     urls_validas = urls_validas[:MAX_FUENTES_CONTRASTE]
-    noticias_validas = len(urls_validas)
 
-    # --- Análisis matemático: entidades y cifras ---
-    entidades_mias = {ent.text.lower() for ent in doc_original.ents if ent.label_ in ("PER", "LOC", "ORG")}
+    if not urls_validas:
+        return {"veracidad": 0.0, "urls_validas": [], "contenidos": contenidos}
+
+    entidades_mias = {e.text.lower() for e in doc_original.ents if e.label_ in ("PER", "LOC", "ORG")}
     numeros_mios = {t.text for t in doc_original if t.pos_ == "NUM" or t.like_num}
 
     entidades_contraste_total = set()
     numeros_contraste_total = set()
     for url in urls_validas:
         doc_v = nlp_lg(contenidos[url])
-        entidades_contraste_total |= {ent.text.lower() for ent in doc_v.ents if ent.label_ in ("PER", "LOC", "ORG")}
+        entidades_contraste_total |= {e.text.lower() for e in doc_v.ents if e.label_ in ("PER", "LOC", "ORG")}
         numeros_contraste_total |= {t.text for t in doc_v if t.pos_ == "NUM" or t.like_num}
 
-    omisiones_claves = list(entidades_mias - entidades_contraste_total)
-    cifras_nuevas = list(numeros_contraste_total - numeros_mios)
-
+    cifras_nuevas = numeros_contraste_total - numeros_mios
     tasa_validacion = (
         len(entidades_mias & entidades_contraste_total) / len(entidades_mias)
         if entidades_mias else 1.0
     )
     total_numeros = len(numeros_mios) + len(cifras_nuevas)
-    tasa_numeros_correctos = (len(numeros_mios) / total_numeros) if total_numeros else 1.0
+    tasa_numeros = (len(numeros_mios) / total_numeros) if total_numeros else 1.0
 
-    promedio_coincidencia = (tasa_validacion + tasa_numeros_correctos) / 2
-    if noticias_validas == 0:
-        veracidad = 00.0
-    else:
-        veracidad = 50.0 + (promedio_coincidencia * 50.0)
-        veracidad = max(0.0, min(100.0, round(veracidad, 2)))
+    promedio = (tasa_validacion + tasa_numeros) / 2
+    veracidad = max(0.0, min(100.0, round(50.0 + promedio * 50.0, 2)))
 
-    # --- Contraste con IA: UNA sola llamada por noticia con TODAS las
-    # fuentes juntas (antes: una llamada por cada fuente -> N veces el
-    # system_instruction y N round-trips) ---
+    return {"veracidad": veracidad, "urls_validas": urls_validas, "contenidos": contenidos}
+
+
+def compute_score(noticia):
+    """Score completo (matemático + IA). Se usa solo en /verify."""
+    datos = calcular_score_matematico(noticia)
+    veracidad = datos["veracidad"]
+    urls_validas = datos["urls_validas"]
+    contenidos = datos["contenidos"]
+
     conclusion_gis = ""
     veracidad_total_gis = None
 
@@ -364,7 +360,7 @@ def compute_score(noticia):
             {"fuente": url, "texto": contenidos[url][:CARACTERES_CONTRASTE_IA]}
             for url in urls_validas
         ]
-        
+
         prompt = _armar_prompt_v2(noticia["content"][:CARACTERES_CONTRASTE_IA], otras_versiones)
 
         try:
@@ -379,14 +375,11 @@ def compute_score(noticia):
 
             if veracidad_total_gis is not None:
                 veracidad_total_gis = max(0.0, min(100.0, round(veracidad_total_gis, 2)))
-        except Exception:
+        except Exception as e:
+            print("ERROR IA:", repr(e), flush=True)
             veracidad_total_gis = None
 
     if veracidad_total_gis is None:
-        # Sin evaluación de IA disponible (no había fuentes o falló la
-        # llamada): en vez de castigar con 0.00, se usa el puntaje
-        # matemático para que el promedio ponderado no se desplome
-        # artificialmente por un problema ajeno a la veracidad real.
         veracidad_total_gis = veracidad
         conclusion_gis = conclusion_gis or (
             "No se encontraron suficientes fuentes externas para contrastar esta "
@@ -394,7 +387,6 @@ def compute_score(noticia):
             "de entidades y cifras, no implica que la noticia sea falsa."
         )
 
-    # Puntaje final en escala 0-100 (porcentaje real de credibilidad):
     # 45% ponderación IA + 55% ponderación matemática.
     porcentaje_tot_veracidad = (veracidad_total_gis * 0.45) + (veracidad * 0.55)
     porcentaje_tot_veracidad = round(max(0.0, min(100.0, porcentaje_tot_veracidad)), 2)
@@ -419,10 +411,7 @@ categorias_validas = {
 
 
 def _procesar_articulo(i, art):
-    """Arma la noticia 'liviana' para el feed: NO llama a compute_score
-    (ni scraping ni IA). Eso se difiere a /verify, y solo se ejecuta si el
-    usuario realmente abre esa noticia -> evita gastar tokens de IA y
-    tiempo de scraping en las noticias que nadie termina leyendo."""
+    """Arma la noticia para el feed (sin IA)."""
     titulo = art.get("title", "")
     contenido = art.get("content", "") or ""
     imagen = art.get("image")
@@ -452,12 +441,24 @@ def _procesar_articulo(i, art):
     }
 
 
+def _agregar_score(noticia):
+    """Agrega el score matemático (sin IA) a una noticia."""
+    try:
+        datos = calcular_score_matematico(noticia)
+        noticia["score"] = datos["veracidad"]
+        noticia["fuentes_encontradas"] = len(datos["urls_validas"])
+    except Exception as e:
+        print("ERROR SCORE:", repr(e), flush=True)
+        noticia["score"] = None
+        noticia["fuentes_encontradas"] = 0
+    return noticia
+
+
 @app.route("/process", methods=["GET"])
 def obtener_noticias():
-    """Endpoint rápido para el feed/listado. No corre scraping ni IA,
-    así que no gasta tokens: solo arma id/title/image/content/keywords
-    para las 15 noticias. El score se calcula después, por noticia,
-    en /verify."""
+    """Devuelve las noticias con content, keywords y score matemático
+    (sin IA). Si fuentes_encontradas es 0, el score 0 significa
+    'sin fuentes para contrastar', no que la noticia sea falsa."""
     category_user = request.args.get("category", "general")
     category = categorias_validas.get(category_user.lower(), "general")
     url = f"https://gnews.io/api/v4/top-headlines?category={category}&lang=es&country=cl&max=15&apikey={gnews_api_key}"
@@ -470,6 +471,9 @@ def obtener_noticias():
 
         global_news = [_procesar_articulo(i, art) for i, art in enumerate(articles)]
 
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS_SCORE) as ex:
+            global_news = list(ex.map(_agregar_score, global_news))
+
         return Response(
             json.dumps({"status": "ok", "datos": global_news}, ensure_ascii=False),
             content_type="application/json; charset=utf-8",
@@ -480,10 +484,7 @@ def obtener_noticias():
 
 @app.route("/verify", methods=["GET", "POST"])
 def verificar_noticia():
-    """Endpoint 'bajo demanda': la app (App Inventor) lo llama SOLO cuando
-    el usuario abre una noticia puntual. Recibe el content y keywords que
-    ya devolvió /process (no requiere que el servidor guarde nada en
-    memoria) y ahí sí corre el scraping + análisis matemático + IA.
+    """Endpoint bajo demanda: corre scraping + análisis matemático + IA.
 
     Body JSON esperado:
     {
