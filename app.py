@@ -324,6 +324,7 @@ def calcular_score_matematico(noticia):
     # Se procesa cada artículo UNA sola vez y se guardan solo los datos
     # livianos (entidades y números), no el objeto Doc completo.
     urls_validas = []
+    similitudes = []
     entidades_contraste_total = set()
     numeros_contraste_total = set()
 
@@ -331,7 +332,9 @@ def calcular_score_matematico(noticia):
         if len(urls_validas) >= MAX_FUENTES_CONTRASTE:
             break
         doc_v = nlp_lg(texto)
-        if doc_original.similarity(doc_v) > 0.75:
+        sim = float(doc_original.similarity(doc_v))
+        similitudes.append(round(sim, 3))
+        if sim > 0.75:
             urls_validas.append(url)
             entidades_contraste_total |= {
                 e.text.lower() for e in doc_v.ents if e.label_ in ("PER", "LOC", "ORG")
@@ -343,7 +346,8 @@ def calcular_score_matematico(noticia):
 
     if not urls_validas:
         gc.collect()
-        return {"veracidad": 0.0, "urls_validas": [], "contenidos": contenidos}
+        return {"veracidad": 0.0, "urls_validas": [], "contenidos": contenidos,
+                "candidatas": len(candidatas), "similitudes": similitudes}
 
     entidades_mias = {e.text.lower() for e in doc_original.ents if e.label_ in ("PER", "LOC", "ORG")}
     numeros_mios = {t.text for t in doc_original if t.pos_ == "NUM" or t.like_num}
@@ -360,7 +364,8 @@ def calcular_score_matematico(noticia):
     veracidad = max(0.0, min(100.0, round(50.0 + promedio * 50.0, 2)))
 
     gc.collect()
-    return {"veracidad": veracidad, "urls_validas": urls_validas, "contenidos": contenidos}
+    return {"veracidad": veracidad, "urls_validas": urls_validas, "contenidos": contenidos,
+            "candidatas": len(candidatas), "similitudes": similitudes}
 
 
 def compute_score(noticia):
@@ -372,6 +377,7 @@ def compute_score(noticia):
 
     conclusion_gis = ""
     veracidad_total_gis = None
+    analisis_data = None
 
     if urls_validas:
         otras_versiones = [
@@ -410,7 +416,17 @@ def compute_score(noticia):
     porcentaje_tot_veracidad = (veracidad_total_gis * 0.45) + (veracidad * 0.55)
     porcentaje_tot_veracidad = round(max(0.0, min(100.0, porcentaje_tot_veracidad)), 2)
 
-    return porcentaje_tot_veracidad, conclusion_gis
+    detalle = {
+        "score_matematico": veracidad,
+        "score_ia": veracidad_total_gis,
+        "candidatas_encontradas": datos.get("candidatas", 0),
+        "articulos_descargados": len(contenidos),
+        "similitudes": datos.get("similitudes", []),
+        "fuentes_usadas": urls_validas,
+        "analisis_ia": analisis_data,
+    }
+
+    return porcentaje_tot_veracidad, conclusion_gis, detalle
 
 
 app = Flask(__name__)
@@ -524,8 +540,13 @@ def verificar_noticia():
 
     try:
         noticia = {"content": contenido, "keywords": keywords}
-        score, conclusion = compute_score(noticia)
-        return jsonify({"status": "ok", "score": score, "conclusion": conclusion})
+        score, conclusion, detalle = compute_score(noticia)
+        return jsonify({
+            "status": "ok",
+            "score": score,
+            "conclusion": conclusion,
+            "detalle": detalle,
+        })
     except Exception as e:
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
